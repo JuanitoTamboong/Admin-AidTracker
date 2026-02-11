@@ -2660,8 +2660,7 @@ function loadSettings() {
     const appNameEl = document.getElementById('app-name');
     if (appNameEl) appNameEl.value = settings.appName || 'AidTracker';
 
-    const languageEl = document.getElementById('default-language');
-    if (languageEl) languageEl.value = settings.language || 'en';
+
 
     const timezoneEl = document.getElementById('timezone');
     if (timezoneEl) timezoneEl.value = settings.timezone || 'Asia/Manila';
@@ -2685,15 +2684,13 @@ function loadSettings() {
     const auditLoggingEl = document.getElementById('audit-logging');
     if (auditLoggingEl) auditLoggingEl.checked = settings.auditLogging !== false;
 
-    const ipWhitelistEl = document.getElementById('ip-whitelist');
-    if (ipWhitelistEl) ipWhitelistEl.checked = settings.ipWhitelist || false;
+
 
     // Notification settings
     const emailNotificationsEl = document.getElementById('email-notifications');
     if (emailNotificationsEl) emailNotificationsEl.checked = settings.emailNotifications !== false;
 
-    const smsNotificationsEl = document.getElementById('sms-notifications');
-    if (smsNotificationsEl) smsNotificationsEl.checked = settings.smsNotifications || false;
+
 
     const pushNotificationsEl = document.getElementById('push-notifications');
     if (pushNotificationsEl) pushNotificationsEl.checked = settings.pushNotifications !== false;
