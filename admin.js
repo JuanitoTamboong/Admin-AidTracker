@@ -672,28 +672,24 @@ function updateReportsByStatusChart() {
     const statusCounts = {
         'pending': 0,
         'investigating': 0,
-        'assigned': 0,
-        'resolved': 0,
-        'cancelled': 0
+        'resolved': 0
     };
-    
+
     allReports.forEach(report => {
         const status = report.status || 'pending';
         if (statusCounts[status] !== undefined) {
             statusCounts[status]++;
         }
     });
-    
-    const labels = Object.keys(statusCounts).map(key => 
+
+    const labels = Object.keys(statusCounts).map(key =>
         key.charAt(0).toUpperCase() + key.slice(1)
     );
     const data = Object.values(statusCounts);
     const colors = [
         '#f59e0b', // pending - warning
         '#3b82f6', // investigating - primary
-        '#8b5cf6', // assigned - info
-        '#10b981', // resolved - success
-        '#ef4444'  // cancelled - danger
+        '#10b981'  // resolved - success
     ];
     
     // Destroy existing chart if it exists
