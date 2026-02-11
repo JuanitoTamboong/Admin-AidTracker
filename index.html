@@ -8,6 +8,9 @@
 <!-- Include Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- Include Chart.js for better visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <!-- Include Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -90,17 +93,17 @@
         <button id="btn-dashboard" data-target="dashboard" class="nav-item">
           <i class="fas fa-chart-pie"></i>
           <span>Dashboard</span>
-          <div class="notification-badge">3</div>
+          <div class="notification-badge">!</div>
         </button>
         <button id="btn-responders" class="nav-item active" data-target="responders">
           <i class="fas fa-user-shield"></i>
           <span>Responders</span>
-          <div class="notification-badge">12</div>
+          <div class="notification-badge">0</div>
         </button>
         <button id="btn-reports" data-target="reports" class="nav-item">
           <i class="fas fa-file-medical-alt"></i>
           <span>Reports</span>
-          <div class="notification-badge">8</div>
+          <div class="notification-badge">0</div>
         </button>
       </div>
       
@@ -164,14 +167,14 @@
       
       <div class="header-right">
         <div class="header-actions">
-          <button class="header-action" title="Notifications">
+          <button class="header-action" title="Notifications" onclick="showNotification('You have 5 unread notifications', 'info')">
             <i class="fas fa-bell"></i>
             <span class="badge">5</span>
           </button>
-          <button class="header-action" title="Search">
+          <button class="header-action" title="Search" onclick="document.getElementById('responder-search').focus()">
             <i class="fas fa-search"></i>
           </button>
-          <button class="header-action" title="Help">
+          <button class="header-action" title="Help" onclick="alert('AidTracker Admin Console\\n\\nVersion 1.0.0\\n\\nFor assistance, please contact system administrator.')">
             <i class="fas fa-question-circle"></i>
           </button>
         </div>
@@ -192,9 +195,9 @@
           <div class="stat-value" id="total-responders">0</div>
           <div class="stat-label">Total Responders</div>
         </div>
-        <div class="stat-trend positive">
+        <div class="stat-trend positive" id="responders-trend">
           <i class="fas fa-arrow-up"></i>
-          <span>12%</span>
+          <span>0%</span>
         </div>
       </div>
       
@@ -206,9 +209,9 @@
           <div class="stat-value" id="available-responders">0</div>
           <div class="stat-label">Available Now</div>
         </div>
-        <div class="stat-trend positive">
+        <div class="stat-trend positive" id="available-trend">
           <i class="fas fa-arrow-up"></i>
-          <span>8%</span>
+          <span>0%</span>
         </div>
       </div>
       
@@ -220,9 +223,9 @@
           <div class="stat-value" id="active-responders">0</div>
           <div class="stat-label">Active Now</div>
         </div>
-        <div class="stat-trend negative">
+        <div class="stat-trend negative" id="active-trend">
           <i class="fas fa-arrow-down"></i>
-          <span>3%</span>
+          <span>0%</span>
         </div>
       </div>
       
@@ -234,9 +237,9 @@
           <div class="stat-value" id="locations-covered">0</div>
           <div class="stat-label">Locations Covered</div>
         </div>
-        <div class="stat-trend positive">
+        <div class="stat-trend positive" id="locations-trend">
           <i class="fas fa-arrow-up"></i>
-          <span>5%</span>
+          <span>0%</span>
         </div>
       </div>
     </section>
@@ -257,12 +260,9 @@
             <i class="fas fa-filter"></i>
             Filter
           </button>
-          <button class="btn primary" onclick="addNewResponder()">
-            <i class="fas fa-plus"></i>
-            Add Responder
-          </button>
           <button class="btn ghost" onclick="exportResponders()">
             <i class="fas fa-download"></i>
+            Export
           </button>
         </div>
       </div>
@@ -321,43 +321,150 @@
           </button>
           <div class="page-numbers">
             <span class="page-number active">1</span>
-            <span class="page-number">2</span>
-            <span class="page-number">3</span>
-            <span class="dots">...</span>
-            <span class="page-number">10</span>
           </div>
-          <button class="pagination-btn" onclick="nextPage()">
+          <button class="pagination-btn" onclick="nextPage()" disabled>
             <i class="fas fa-chevron-right"></i>
           </button>
         </div>
       </div>
     </section>
 
-    <!-- Hidden panels -->
+    <!-- DASHBOARD PANEL -->
     <section id="dashboard" class="panel">
       <div class="panel-header">
-        <h2>Dashboard Overview</h2>
+        <div class="panel-title">
+          <h2>Dashboard Overview</h2>
+          <p class="panel-subtitle">Real-time system metrics and responder status</p>
+        </div>
+        <div class="panel-actions">
+          <button class="btn ghost" onclick="fetchAllData()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+          </button>
+        </div>
       </div>
-      <div class="dashboard-content">
-        <div class="card-row">
-          <div class="card">
-            <div class="muted">Total Users</div>
-            <div class="count" id="total-users">0</div>
+
+      <!-- Dashboard Statistics -->
+      <div class="dashboard-stats">
+        <div class="dashboard-stat-card">
+          <div class="dashboard-stat-header">
+            <div class="dashboard-stat-icon primary">
+              <i class="fas fa-file-medical-alt"></i>
+            </div>
+            <div class="dashboard-stat-trend positive" id="total-reports-trend">+0%</div>
           </div>
-          <div class="card">
-            <div class="muted">Active Reports</div>
-            <div class="count" id="active-reports">0</div>
+          <div class="dashboard-stat-value" id="total-reports">0</div>
+          <div class="dashboard-stat-label">Total Reports</div>
+          <div class="dashboard-stat-detail">From all users</div>
+        </div>
+
+        <div class="dashboard-stat-card">
+          <div class="dashboard-stat-header">
+            <div class="dashboard-stat-icon info">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="dashboard-stat-trend positive" id="total-users-trend">+0%</div>
           </div>
-          <div class="card">
-            <div class="muted">Response Time</div>
-            <div class="count">4.2m</div>
+          <div class="dashboard-stat-value" id="total-users">0</div>
+          <div class="dashboard-stat-label">Total Users</div>
+          <div class="dashboard-stat-detail">Registered in system</div>
+        </div>
+
+        <div class="dashboard-stat-card">
+          <div class="dashboard-stat-header">
+            <div class="dashboard-stat-icon success">
+              <i class="fas fa-user-shield"></i>
+            </div>
+            <div class="dashboard-stat-trend positive" id="total-responders-trend">+0%</div>
+          </div>
+          <div class="dashboard-stat-value" id="dashboard-total-responders">0</div>
+          <div class="dashboard-stat-label">Total Responders</div>
+          <div class="dashboard-stat-detail">Emergency personnel</div>
+        </div>
+
+        <div class="dashboard-stat-card">
+          <div class="dashboard-stat-header">
+            <div class="dashboard-stat-icon warning">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="dashboard-stat-trend negative" id="active-reports-trend">0%</div>
+          </div>
+          <div class="dashboard-stat-value" id="dashboard-active-reports">0</div>
+          <div class="dashboard-stat-label">Active Reports</div>
+          <div class="dashboard-stat-detail">Pending resolution</div>
+        </div>
+      </div>
+
+      <!-- Dashboard Charts -->
+      <div class="dashboard-charts">
+        <div class="dashboard-chart-card">
+          <div class="dashboard-chart-header">
+            <h3>Reports by Status</h3>
+          </div>
+          <div class="dashboard-chart-container">
+            <canvas id="reports-by-status-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="dashboard-chart-card">
+          <div class="dashboard-chart-header">
+            <h3>Reports Timeline (Last 7 Days)</h3>
+          </div>
+          <div class="dashboard-chart-container">
+            <canvas id="reports-timeline-chart-dashboard"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="recent-activity-list">
+        <div class="recent-activity-header">
+          <h3>Recent Activity</h3>
+          <button class="btn ghost small" onclick="updateRecentActivity()">
+            <i class="fas fa-sync-alt"></i>
+          </button>
+        </div>
+        <div class="recent-activity-items" id="recent-activity-items">
+          <div class="recent-activity-item">
+            <div class="recent-activity-icon system">
+              <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <div class="recent-activity-content">
+              <div class="recent-activity-message">Loading recent activity...</div>
+              <div class="recent-activity-time">Just now</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="recent-activity-list">
+        <div class="recent-activity-header">
+          <h3>Quick Stats</h3>
+        </div>
+        <div class="quick-stats-grid">
+          <div class="quick-stat-card">
+            <div class="quick-stat-value" id="today-reports">0</div>
+            <div class="quick-stat-label">Reports Today</div>
+          </div>
+          <div class="quick-stat-card">
+            <div class="quick-stat-value" id="avg-response">0m</div>
+            <div class="quick-stat-label">Avg Response Time</div>
+          </div>
+          <div class="quick-stat-card">
+            <div class="quick-stat-value" id="high-priority">0</div>
+            <div class="quick-stat-label">High Priority</div>
+          </div>
+          <div class="quick-stat-card">
+            <div class="quick-stat-value" id="coverage">0%</div>
+            <div class="quick-stat-label">Coverage Rate</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ANALYTICS PANEL -->
-    <section id="analytics" class="panel">
+<!-- ANALYTICS PANEL -->
+<section id="analytics" class="panel">
       <div class="panel-header">
         <div class="panel-title">
           <h2>Analytics Dashboard</h2>
@@ -366,7 +473,7 @@
         <div class="panel-actions">
           <select id="analytics-timeframe" onchange="updateAnalytics()">
             <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
+            <option value="30d" selected>Last 30 Days</option>
             <option value="90d">Last 90 Days</option>
             <option value="1y">Last Year</option>
           </select>
@@ -385,7 +492,7 @@
               <i class="fas fa-chart-line"></i>
             </div>
             <div class="metric-content">
-              <div class="metric-value" id="reports-trend">+12%</div>
+              <div class="metric-value" id="reports-trend">+0%</div>
               <div class="metric-label">Reports Trend</div>
               <div class="metric-subtext" id="reports-count">0 reports this period</div>
             </div>
@@ -396,7 +503,7 @@
               <i class="fas fa-clock"></i>
             </div>
             <div class="metric-content">
-              <div class="metric-value" id="avg-response-time">4.2m</div>
+              <div class="metric-value" id="avg-response-time">0m</div>
               <div class="metric-label">Avg Response Time</div>
               <div class="metric-subtext">Across all reports</div>
             </div>
@@ -407,7 +514,7 @@
               <i class="fas fa-users"></i>
             </div>
             <div class="metric-content">
-              <div class="metric-value" id="user-engagement">85%</div>
+              <div class="metric-value" id="user-engagement">0%</div>
               <div class="metric-label">User Engagement</div>
               <div class="metric-subtext">Active users ratio</div>
             </div>
@@ -430,10 +537,6 @@
           <div class="chart-card">
             <div class="chart-header">
               <h3>Reports by Type</h3>
-              <div class="chart-controls">
-                <button class="chart-toggle active" data-chart="pie">Pie</button>
-                <button class="chart-toggle" data-chart="bar">Bar</button>
-              </div>
             </div>
             <div class="chart-container">
               <canvas id="reports-type-chart"></canvas>
@@ -443,10 +546,6 @@
           <div class="chart-card">
             <div class="chart-header">
               <h3>Reports Over Time</h3>
-              <div class="chart-controls">
-                <button class="chart-toggle active" data-chart="line">Line</button>
-                <button class="chart-toggle" data-chart="area">Area</button>
-              </div>
             </div>
             <div class="chart-container">
               <canvas id="reports-timeline-chart"></canvas>
@@ -785,7 +884,10 @@
           </thead>
           <tbody id="users-table">
             <tr>
-              <td colspan="6" style="text-align:center;padding:20px;">No users table found</td>
+              <td colspan="6" class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading users...</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -811,7 +913,10 @@
           </thead>
           <tbody id="reports-table">
             <tr>
-              <td colspan="7" style="text-align:center;padding:20px;">Loading reports...</td>
+              <td colspan="7" class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading reports...</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -844,7 +949,7 @@
               <i class="fas fa-users"></i>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="active-users-count">0</div>
+              <div class="stat-value" id="active-users-count">1</div>
               <div class="stat-label">Active Users</div>
             </div>
           </div>
@@ -962,112 +1067,14 @@
           </button>
           <div class="page-numbers">
             <span class="page-number active">1</span>
-            <span class="page-number">2</span>
-            <span class="page-number">3</span>
-            <span class="dots">...</span>
-            <span class="page-number">10</span>
           </div>
-          <button class="pagination-btn" onclick="nextAuditPage()">
+          <button class="pagination-btn" onclick="nextAuditPage()" disabled>
             <i class="fas fa-chevron-right"></i>
           </button>
         </div>
       </div>
     </section>
   </main>
-</div>
-
-<!-- Add Responder Modal -->
-<div id="add-responder-modal" class="modal-overlay">
-  <div class="modal-dialog">
-    <div class="modal-header">
-      <h3>Add New Responder</h3>
-      <button class="modal-close" onclick="closeAddResponderModal()">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-    
-    <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="responder-name">Full Name *</label>
-          <div class="input-with-icon">
-            <i class="fas fa-user"></i>
-            <input id="responder-name" placeholder="Enter full name" class="form-input">
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="responder-unit">Unit/Department *</label>
-          <div class="input-with-icon">
-            <i class="fas fa-building"></i>
-            <input id="responder-unit" placeholder="e.g., Fire Station 1, Police Dept" class="form-input">
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="responder-contact">Contact Number *</label>
-          <div class="input-with-icon">
-            <i class="fas fa-phone"></i>
-            <input id="responder-contact" placeholder="+1 (555) 123-4567" class="form-input">
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="responder-email">Email Address</label>
-          <div class="input-with-icon">
-            <i class="fas fa-envelope"></i>
-            <input id="responder-email" type="email" placeholder="responder@agency.gov" class="form-input">
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="responder-badge">Badge/ID Number</label>
-          <div class="input-with-icon">
-            <i class="fas fa-id-card"></i>
-            <input id="responder-badge" placeholder="Optional badge or ID number" class="form-input">
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="responder-status">Current Status</label>
-          <div class="input-with-icon">
-            <i class="fas fa-signal"></i>
-            <select id="responder-status" class="form-select">
-              <option value="Available">Available</option>
-              <option value="On Duty">On Duty</option>
-              <option value="Assigned">Assigned</option>
-              <option value="Busy">Busy</option>
-              <option value="On Call">On Call</option>
-              <option value="Off Duty">Off Duty</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="form-group full-width">
-          <label for="responder-skills">Special Skills/Qualifications</label>
-          <div class="input-with-icon">
-            <i class="fas fa-certificate"></i>
-            <textarea id="responder-skills" placeholder="Enter special skills or qualifications..." rows="3" class="form-textarea"></textarea>
-          </div>
-        </div>
-        
-        <div class="form-group full-width">
-          <label for="responder-notes">Additional Notes</label>
-          <textarea id="responder-notes" placeholder="Any additional information..." rows="2" class="form-textarea"></textarea>
-        </div>
-      </div>
-    </div>
-    
-    <div class="modal-footer">
-      <button class="btn secondary" onclick="closeAddResponderModal()">
-        Cancel
-      </button>
-      <button class="btn primary" onclick="saveNewResponder()">
-        <i class="fas fa-save"></i>
-        Save Responder
-      </button>
-    </div>
-  </div>
 </div>
 
 <!-- Status Update Modal -->

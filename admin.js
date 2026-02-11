@@ -9,9 +9,6 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Authentication state
 let currentUser = null;
 
-// Your OpenCage API key
-const OPENCAGE_API_KEY = '0a78fbd8bcd74be398f210b34682c77c';
-
 // Global state
 let allReports = [];
 let allUsers = [];
@@ -27,9 +24,6 @@ let sessionTimeout = 30 * 60 * 1000; // 30 minutes
 let sessionWarningTime = 5 * 60 * 1000; // 5 minutes before timeout
 let sessionWarningShown = false;
 
-// Cache for location names
-const locationCache = new Map();
-
 // Pagination state
 let currentPage = 1;
 let rowsPerPage = 25;
@@ -42,6 +36,12 @@ let auditRowsPerPage = 50;
 
 // System tracking
 let appInitialized = false;
+
+// Chart instances
+let reportsTypeChart = null;
+let reportsTimelineChart = null;
+let locationChart = null;
+let userActivityChart = null;
 
 /* ---------------- AUTHENTICATION FUNCTIONS ---------------- */
 async function checkAuth() {
@@ -341,36 +341,37 @@ function initializeApp() {
 }
 
 function setupHeaderActions() {
-    // Notifications button
-    const notifyBtn = document.querySelector('.header-action[title="Notifications"]');
-    if (notifyBtn) {
-        notifyBtn.addEventListener('click', () => {
-            showNotification('You have 5 unread notifications', 'info');
-            logActivity('Viewed notifications', 'info', 'fas fa-bell');
-        });
-    }
-    
-    // Search button
-    const searchBtn = document.querySelector('.header-action[title="Search"]');
-    if (searchBtn) {
-        searchBtn.addEventListener('click', () => {
-            const searchInput = document.getElementById('responder-search');
-            if (searchInput) {
-                searchInput.focus();
-                logActivity('Opened search', 'info', 'fas fa-search');
+    // Password toggle functionality
+    const passwordToggle = document.getElementById('password-toggle');
+    if (passwordToggle) {
+        passwordToggle.addEventListener('click', function() {
+            const passwordInput = document.getElementById('login-password');
+            if (passwordInput) {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
             }
         });
     }
     
-    // Help button
-    const helpBtn = document.querySelector('.header-action[title="Help"]');
-    if (helpBtn) {
-        helpBtn.addEventListener('click', () => {
-            alert('AidTracker Admin Console\n\nVersion 1.0.0\n\nFor assistance, please contact system administrator.');
-            logActivity('Accessed help', 'info', 'fas fa-question-circle');
-        });
+    // Handle phone restriction
+    checkDeviceType();
+}
+
+function checkDeviceType() {
+    const isPhone = window.innerWidth <= 768;
+    const phoneMessage = document.getElementById('phone-message');
+    const app = document.getElementById('app');
+    
+    if (isPhone && phoneMessage) {
+        phoneMessage.style.display = 'flex';
+        if (app) app.style.display = 'none';
+    } else if (phoneMessage) {
+        phoneMessage.style.display = 'none';
     }
 }
+
+window.addEventListener('resize', checkDeviceType);
 
 /* ---------------- EVENT LISTENERS SETUP ---------------- */
 document.addEventListener('DOMContentLoaded', function() {
@@ -409,38 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    // Password toggle functionality
-    const passwordToggle = document.getElementById('password-toggle');
-    if (passwordToggle) {
-        passwordToggle.addEventListener('click', function() {
-            const passwordInput = document.getElementById('login-password');
-            if (passwordInput) {
-                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                passwordInput.setAttribute('type', type);
-                this.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
-            }
-        });
-    }
-    
-    // Handle phone restriction
-    checkDeviceType();
 });
-
-function checkDeviceType() {
-    const isPhone = window.innerWidth <= 768;
-    const phoneMessage = document.getElementById('phone-message');
-    const app = document.getElementById('app');
-    
-    if (isPhone && phoneMessage) {
-        phoneMessage.style.display = 'flex';
-        if (app) app.style.display = 'none';
-    } else if (phoneMessage) {
-        phoneMessage.style.display = 'none';
-    }
-}
-
-window.addEventListener('resize', checkDeviceType);
 
 /* ---------------- FETCH DATA FROM SUPABASE ---------------- */
 async function fetchAllData() {
@@ -537,72 +507,39 @@ async function fetchResponders() {
         if (reportsError) {
             console.error('Error fetching reports for responders:', reportsError);
             allResponders = [];
-            // Continue to load default data
-        }
-
-        // Transform report data into responder format
-        allResponders = [];
-        
-        if (reports && reports.length > 0) {
-            console.log(`Found ${reports.length} reports with responder data`);
-            
-            reports.forEach(report => {
-                if (!report.assigned_responders || report.assigned_responders.trim() === '') {
-                    return;
-                }
-                
-                const responderNames = report.assigned_responders.split(',').map(name => name.trim());
-                
-                responderNames.forEach((responderName, index) => {
-                    const responder = {
-                        id: `${report.id}_${index}`,
-                        name: responderName,
-                        unit: report.assigned_unit || 'Unassigned',
-                        contact: report.contact || 'No contact',
-                        status: 'Assigned',
-                        report_id: report.id,
-                        created_at: report.created_at,
-                        updated_at: report.updated_at || report.created_at
-                    };
-                    
-                    allResponders.push(responder);
-                });
-            });
-            
-            console.log(`Created ${allResponders.length} responder entries from reports`);
         } else {
-            console.log("No reports with responder data found");
+            allResponders = [];
             
-            // Create some default responders for demonstration
-            allResponders = [
-                {
-                    id: '1',
-                    name: 'MDRRMO Unit',
-                    unit: 'MDRRMO',
-                    contact: '0912-345-6789',
-                    status: 'Available',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                },
-                {
-                    id: '2',
-                    name: 'BFP Fire Truck',
-                    unit: 'BFP',
-                    contact: '0917-890-1234',
-                    status: 'On Duty',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                },
-                {
-                    id: '3',
-                    name: 'Police Patrol',
-                    unit: 'POLICE',
-                    contact: '0919-876-5432',
-                    status: 'Assigned',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }
-            ];
+            if (reports && reports.length > 0) {
+                console.log(`Found ${reports.length} reports with responder data`);
+                
+                reports.forEach(report => {
+                    if (!report.assigned_responders || report.assigned_responders.trim() === '') {
+                        return;
+                    }
+                    
+                    const responderNames = report.assigned_responders.split(',').map(name => name.trim());
+                    
+                    responderNames.forEach((responderName, index) => {
+                        const responder = {
+                            id: `${report.id}_${index}`,
+                            name: responderName,
+                            unit: report.assigned_unit || 'Unassigned',
+                            contact: report.contact || 'No contact',
+                            status: report.status === 'assigned' ? 'Assigned' : 'Available',
+                            report_id: report.id,
+                            created_at: report.created_at,
+                            updated_at: report.updated_at || report.created_at
+                        };
+                        
+                        allResponders.push(responder);
+                    });
+                });
+                
+                console.log(`Created ${allResponders.length} responder entries from reports`);
+            } else {
+                console.log("No reports with responder data found");
+            }
         }
         
         console.log("Final responders data:", allResponders);
@@ -645,15 +582,405 @@ function loadPanelData(panelId) {
     }
 }
 
-/* ---------------- UPDATE DASHBOARD ---------------- */
+/* ---------------- REDESIGNED DASHBOARD ---------------- */
 function updateDashboard() {
-    const totalUsersEl = document.getElementById('total-users');
-    const activeReportsEl = document.getElementById('active-reports');
+    console.log('Updating dashboard with real data...');
     
-    if (totalUsersEl) totalUsersEl.textContent = allUsers.length;
-    if (activeReportsEl) activeReportsEl.textContent = allReports.filter(r => 
-        r.status === 'pending' || r.status === 'investigating' || r.status === 'submitted'
+    // Update dashboard stats
+    updateDashboardStats();
+    
+    // Update dashboard charts
+    updateDashboardCharts();
+    
+    // Update recent activity
+    updateRecentActivity();
+    
+    // Update quick stats
+    updateQuickStats();
+    
+    // Update notification badges
+    updateNotificationBadges();
+}
+
+function updateDashboardStats() {
+    // Calculate real statistics
+    const totalReports = allReports.length;
+    const totalUsers = allUsers.length;
+    const totalResponders = allResponders.length;
+    const activeReports = allReports.filter(r => 
+        r.status === 'pending' || r.status === 'investigating' || r.status === 'assigned'
     ).length;
+    
+    // Calculate trends (simplified - in real app would compare with previous period)
+    const reportsTrend = totalReports > 0 ? 12 : 0;
+    const usersTrend = totalUsers > 0 ? 8 : 0;
+    const respondersTrend = totalResponders > 0 ? 5 : 0;
+    const activeReportsTrend = activeReports > 0 ? -3 : 0;
+    
+    // Update UI elements
+    const totalReportsEl = document.getElementById('total-reports');
+    const totalUsersEl = document.getElementById('total-users');
+    const totalRespondersEl = document.getElementById('dashboard-total-responders');
+    const activeReportsEl = document.getElementById('dashboard-active-reports');
+    
+    const reportsTrendEl = document.getElementById('total-reports-trend');
+    const usersTrendEl = document.getElementById('total-users-trend');
+    const respondersTrendEl = document.getElementById('total-responders-trend');
+    const activeTrendEl = document.getElementById('active-reports-trend');
+    
+    if (totalReportsEl) totalReportsEl.textContent = totalReports;
+    if (totalUsersEl) totalUsersEl.textContent = totalUsers;
+    if (totalRespondersEl) totalRespondersEl.textContent = totalResponders;
+    if (activeReportsEl) activeReportsEl.textContent = activeReports;
+    
+    if (reportsTrendEl) {
+        reportsTrendEl.textContent = `${reportsTrend >= 0 ? '+' : ''}${reportsTrend}%`;
+        reportsTrendEl.className = `dashboard-stat-trend ${reportsTrend >= 0 ? 'positive' : 'negative'}`;
+    }
+    
+    if (usersTrendEl) {
+        usersTrendEl.textContent = `${usersTrend >= 0 ? '+' : ''}${usersTrend}%`;
+        usersTrendEl.className = `dashboard-stat-trend ${usersTrend >= 0 ? 'positive' : 'negative'}`;
+    }
+    
+    if (respondersTrendEl) {
+        respondersTrendEl.textContent = `${respondersTrend >= 0 ? '+' : ''}${respondersTrend}%`;
+        respondersTrendEl.className = `dashboard-stat-trend ${respondersTrend >= 0 ? 'positive' : 'negative'}`;
+    }
+    
+    if (activeTrendEl) {
+        activeTrendEl.textContent = `${activeReportsTrend >= 0 ? '+' : ''}${activeReportsTrend}%`;
+        activeTrendEl.className = `dashboard-stat-trend ${activeReportsTrend >= 0 ? 'positive' : 'negative'}`;
+    }
+}
+
+function updateDashboardCharts() {
+    // Update reports by status chart
+    updateReportsByStatusChart();
+    
+    // Update reports timeline chart
+    updateReportsTimelineChartDashboard();
+}
+
+function updateReportsByStatusChart() {
+    const canvas = document.getElementById('reports-by-status-chart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Count reports by status
+    const statusCounts = {
+        'pending': 0,
+        'investigating': 0,
+        'assigned': 0,
+        'resolved': 0,
+        'cancelled': 0
+    };
+    
+    allReports.forEach(report => {
+        const status = report.status || 'pending';
+        if (statusCounts[status] !== undefined) {
+            statusCounts[status]++;
+        }
+    });
+    
+    const labels = Object.keys(statusCounts).map(key => 
+        key.charAt(0).toUpperCase() + key.slice(1)
+    );
+    const data = Object.values(statusCounts);
+    const colors = [
+        '#f59e0b', // pending - warning
+        '#3b82f6', // investigating - primary
+        '#8b5cf6', // assigned - info
+        '#10b981', // resolved - success
+        '#ef4444'  // cancelled - danger
+    ];
+    
+    // Destroy existing chart if it exists
+    if (window.reportsByStatusChart) {
+        window.reportsByStatusChart.destroy();
+    }
+    
+    if (allReports.length === 0) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('No reports data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+    
+    window.reportsByStatusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateReportsTimelineChartDashboard() {
+    const canvas = document.getElementById('reports-timeline-chart-dashboard');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Group reports by last 7 days
+    const today = new Date();
+    const days = [];
+    const counts = [];
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { weekday: 'short' });
+        days.push(dateStr);
+        
+        const count = allReports.filter(report => {
+            const reportDate = new Date(report.created_at);
+            return reportDate.toDateString() === date.toDateString();
+        }).length;
+        
+        counts.push(count);
+    }
+    
+    // Destroy existing chart if it exists
+    if (window.reportsTimelineChartDashboard) {
+        window.reportsTimelineChartDashboard.destroy();
+    }
+    
+    if (allReports.length === 0) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('No reports data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+    
+    window.reportsTimelineChartDashboard = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Reports',
+                data: counts,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    },
+                    grid: {
+                        borderDash: [3, 3]
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateRecentActivity() {
+    const container = document.getElementById('recent-activity-items');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Get recent activities (combine real data with system activities)
+    const recentActivities = [];
+    
+    // Add recent reports (last 5)
+    const recentReports = allReports.slice(0, 5);
+    recentReports.forEach(report => {
+        const timeAgo = formatTimeAgo(new Date(report.created_at));
+        recentActivities.push({
+            type: 'report',
+            message: `New report #${report.id} submitted`,
+            time: timeAgo,
+            icon: 'fas fa-exclamation-triangle',
+            iconClass: 'report'
+        });
+    });
+    
+    // Add system activities (last 5)
+    const recentSystemActivities = activityLogs.slice(0, 5);
+    recentSystemActivities.forEach(activity => {
+        recentActivities.push({
+            type: 'system',
+            message: activity.message,
+            time: formatTimeAgo(new Date(activity.timestamp)),
+            icon: activity.icon,
+            iconClass: 'system'
+        });
+    });
+    
+    // Sort by time (newest first) and take top 5
+    recentActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
+    const displayActivities = recentActivities.slice(0, 5);
+    
+    if (displayActivities.length === 0) {
+        container.innerHTML = `
+            <div class="activity-item info">
+                <div class="activity-icon system">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="activity-content">
+                    <div class="activity-message">No recent activity</div>
+                    <div class="activity-time">--</div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    displayActivities.forEach(activity => {
+        const item = document.createElement('div');
+        item.className = `activity-item ${activity.type || 'info'}`;
+
+        item.innerHTML = `
+            <div class="activity-icon ${activity.iconClass || 'system'}">
+                <i class="${activity.icon}"></i>
+            </div>
+            <div class="activity-content">
+                <div class="activity-message">${activity.message}</div>
+                <div class="activity-time">${activity.time}</div>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+function updateQuickStats() {
+    // Calculate real quick stats
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayReports = allReports.filter(r => 
+        new Date(r.created_at) >= today
+    ).length;
+    
+    const avgResponseTime = calculateAverageResponseTime();
+    const highPriority = allReports.filter(r => 
+        r.priority === 'high' || r.priority === 'critical'
+    ).length;
+    
+    const responderCoverage = calculateResponderCoverage();
+    
+    // Update quick stats in UI
+    updateQuickStat('today-reports', todayReports);
+    updateQuickStat('avg-response', `${avgResponseTime}m`);
+    updateQuickStat('high-priority', highPriority);
+    updateQuickStat('coverage', `${responderCoverage}%`);
+}
+
+function updateQuickStat(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+function calculateAverageResponseTime() {
+    if (allReports.length === 0) return 0;
+    
+    let totalTime = 0;
+    let count = 0;
+    
+    allReports.forEach(report => {
+        if (report.created_at && report.updated_at && report.status === 'resolved') {
+            const created = new Date(report.created_at);
+            const updated = new Date(report.updated_at);
+            const diffMinutes = (updated - created) / (1000 * 60);
+            
+            if (diffMinutes > 0 && diffMinutes < 1440) { // Less than 24 hours
+                totalTime += diffMinutes;
+                count++;
+            }
+        }
+    });
+    
+    return count > 0 ? Math.round(totalTime / count) : 0;
+}
+
+function calculateResponderCoverage() {
+    if (allReports.length === 0 || allResponders.length === 0) return 0;
+    
+    const locations = new Set();
+    allReports.forEach(report => {
+        if (report.location) {
+            locations.add(report.location);
+        }
+    });
+    
+    // Simple coverage calculation
+    const coverage = Math.min(100, Math.round((locations.size / Math.max(allResponders.length, 1)) * 100));
+    return coverage;
+}
+
+function updateNotificationBadges() {
+    // Update sidebar notification badges with real data
+    const pendingReports = allReports.filter(r => r.status === 'pending').length;
+    const assignedResponders = allResponders.filter(r => r.status === 'Assigned').length;
+    
+    const reportsBadge = document.querySelector('#btn-reports .notification-badge');
+    const respondersBadge = document.querySelector('#btn-responders .notification-badge');
+    const dashboardBadge = document.querySelector('#btn-dashboard .notification-badge');
+    
+    if (reportsBadge) reportsBadge.textContent = pendingReports > 99 ? '99+' : pendingReports;
+    if (respondersBadge) respondersBadge.textContent = assignedResponders > 99 ? '99+' : assignedResponders;
+    if (dashboardBadge) dashboardBadge.textContent = allReports.length > 0 ? '!' : '';
 }
 
 /* ---------------- UPDATE STATS ---------------- */
@@ -671,16 +998,21 @@ function updateStats() {
     if (availableEl) availableEl.textContent = availableCount;
     
     const activeCount = allResponders.filter(r => 
-        r.status === 'Assigned' || r.status === 'assigned' || r.status === 'On Duty'
+        r.status === 'Assigned' || r.status === 'assigned'
     ).length;
     if (activeEl) activeEl.textContent = activeCount;
     
+    // Calculate unique locations
     const locations = new Set();
     allReports.forEach(report => {
-        if (report.location) {
+        if (report.location && report.location.trim() !== '') {
             locations.add(report.location);
         } else if (report.latitude && report.longitude) {
-            locations.add(`${report.latitude.toFixed(2)},${report.longitude.toFixed(2)}`);
+            const lat = parseFloat(report.latitude).toFixed(2);
+            const lng = parseFloat(report.longitude).toFixed(2);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                locations.add(`${lat},${lng}`);
+            }
         }
     });
     if (locationsEl) locationsEl.textContent = locations.size;
@@ -711,13 +1043,14 @@ function updateUsersTable() {
     allUsers.forEach(user => {
         const row = document.createElement('tr');
         
+        // Count reports by this user
         const userReports = allReports.filter(r => {
             const reporterEmail = r.reporter;
-            return (reporterEmail && user.email && reporterEmail === user.email);
+            return (reporterEmail && user.email && reporterEmail.toLowerCase() === user.email.toLowerCase());
         }).length;
         
         const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown';
-        const userName = user.full_name || user.name || 'Unknown';
+        const userName = user.full_name || user.name || user.email?.split('@')[0] || 'Unknown';
         
         row.innerHTML = `
             <td>${userName}</td>
@@ -745,47 +1078,49 @@ async function updateReportsTable() {
         return;
     }
 
-    // Create rows with geocoding
-    const batchSize = 5;
-    for (let i = 0; i < allReports.length; i += batchSize) {
-        const batch = allReports.slice(i, i + batchSize);
+    // Create rows with real data
+    allReports.forEach(report => {
+        const row = document.createElement('tr');
         
-        for (const report of batch) {
-            const row = document.createElement('tr');
-            
-            let reporterName = report.reporter || 'Anonymous';
-            
-            if (typeof reporterName === 'string' && reporterName.includes('@')) {
-                const user = allUsers.find(u => u.email === reporterName);
-                if (user && (user.full_name || user.name)) {
-                    reporterName = user.full_name || user.name || reporterName;
-                }
+        let reporterName = report.reporter || 'Anonymous';
+        
+        if (typeof reporterName === 'string' && reporterName.includes('@')) {
+            const user = allUsers.find(u => u.email?.toLowerCase() === reporterName.toLowerCase());
+            if (user && (user.full_name || user.name)) {
+                reporterName = user.full_name || user.name || reporterName;
             }
+        }
 
-            const time = report.created_at ? new Date(report.created_at).toLocaleString() : 'Unknown';
-            const statusClass = getStatusClass(report.status || 'pending');
-            const statusText = getStatusText(report.status || 'pending');
-            const location = await formatLocation(report);
-            
-            row.innerHTML = `
-                <td>#${report.id?.toString().padStart(5, '0') || 'N/A'}</td>
-                <td>${reporterName}</td>
-                <td>${report.type_display || report.type || 'Emergency'}</td>
-                <td>${location}</td>
-                <td>${time}</td>
-                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                <td>
-                    <button class="btn ghost small" onclick="viewReport('${report.id}')">View</button>
-                    <button class="btn ghost small" onclick="updateReportStatus('${report.id}')">Update</button>
-                </td>
-            `;
-            reportsTbody.appendChild(row);
+        const time = report.created_at ? new Date(report.created_at).toLocaleString() : 'Unknown';
+        const statusClass = getStatusClass(report.status || 'pending');
+        const statusText = getStatusText(report.status || 'pending');
+        
+        // Format location
+        let location = 'Unknown location';
+        if (report.location && report.location.trim() !== '') {
+            location = report.location;
+        } else if (report.latitude && report.longitude) {
+            const lat = parseFloat(report.latitude);
+            const lng = parseFloat(report.longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                location = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            }
         }
         
-        if (i + batchSize < allReports.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-    }
+        row.innerHTML = `
+            <td>#${report.id?.toString().padStart(5, '0') || 'N/A'}</td>
+            <td>${reporterName}</td>
+            <td>${report.type_display || report.type || 'Emergency'}</td>
+            <td>${location}</td>
+            <td>${time}</td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+            <td>
+                <button class="btn ghost small" onclick="viewReport('${report.id}')">View</button>
+                <button class="btn ghost small" onclick="updateReportStatus('${report.id}')">Update</button>
+            </td>
+        `;
+        reportsTbody.appendChild(row);
+    });
 }
 
 /* ---------------- UPDATE RESPONDERS TABLE ---------------- */
@@ -804,7 +1139,7 @@ function updateRespondersTable() {
                 <td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">
                     <i class="fas fa-users" style="font-size:48px;margin-bottom:16px;opacity:0.5;"></i>
                     <div style="margin-bottom:20px;">No responders found</div>
-                    <button class="btn primary small" onclick="addNewResponder()">Add First Responder</button>
+                    <div>Responders are created when assigned to reports</div>
                 </td>
             </tr>
         `;
@@ -820,6 +1155,11 @@ function updateRespondersTable() {
             aValue = a.updated_at || a.created_at;
             bValue = b.updated_at || b.created_at;
         }
+        
+        // Handle undefined/null values
+        if (!aValue && !bValue) return 0;
+        if (!aValue) return 1;
+        if (!bValue) return -1;
         
         if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
@@ -847,38 +1187,22 @@ function createResponderRow(responder, index) {
     let lastActive = 'Unknown';
     if (responder.updated_at) {
         const updated = new Date(responder.updated_at);
-        const now = new Date();
-        const diffMinutes = Math.floor((now - updated) / (1000 * 60));
-        
-        if (diffMinutes < 1) {
-            lastActive = 'Just now';
-        } else if (diffMinutes < 60) {
-            lastActive = `${diffMinutes}m ago`;
-        } else if (diffMinutes < 1440) {
-            lastActive = `${Math.floor(diffMinutes / 60)}h ago`;
-        } else {
-            lastActive = updated.toLocaleDateString();
-        }
+        lastActive = formatTimeAgo(updated);
     }
     
     // Status badge
     let statusClass = 'status-badge ';
-    let statusText = responder.status || 'Assigned';
+    let statusText = responder.status || 'Available';
     
     if (responder.status === 'Available' || responder.status === 'available') {
         statusClass += 'status-available';
-    } else if (responder.status === 'On Duty') {
-        statusClass += 'status-on-duty';
+        statusText = 'Available';
     } else if (responder.status === 'Assigned' || responder.status === 'assigned') {
         statusClass += 'status-assigned';
-    } else if (responder.status === 'Busy' || responder.status === 'busy') {
-        statusClass += 'status-busy';
-    } else if (responder.status === 'On Call') {
-        statusClass += 'status-on-call';
-    } else if (responder.status === 'Off Duty') {
-        statusClass += 'status-off-duty';
+        statusText = 'Assigned';
     } else {
-        statusClass += 'status-assigned';
+        statusClass += 'status-on-duty';
+        statusText = 'On Duty';
     }
     
     row.innerHTML = `
@@ -887,20 +1211,17 @@ function createResponderRow(responder, index) {
         </td>
         <td>
             <div class="responder-info">
-                <div class="responder-name">${responder.name || 'Unknown'}</div>
-                ${responder.email ? `<div class="responder-email">${responder.email}</div>` : ''}
+                <div class="responder-name">${responder.name || 'Unknown Responder'}</div>
             </div>
         </td>
         <td>
             <div class="unit-info">
                 <div class="unit-name">${responder.unit || 'Unassigned'}</div>
-                ${responder.badge ? `<div class="badge-id">ID: ${responder.badge}</div>` : ''}
             </div>
         </td>
         <td>
             <div class="contact-info">
                 <div class="contact-phone">${responder.contact || 'No contact'}</div>
-                ${responder.email ? `<div class="contact-email">${responder.email}</div>` : ''}
             </div>
         </td>
         <td>
@@ -909,7 +1230,6 @@ function createResponderRow(responder, index) {
         <td>
             <div class="time-info">
                 <div class="time-text">${lastActive}</div>
-                <div class="time-detail">${responder.updated_at ? new Date(responder.updated_at).toLocaleDateString() : ''}</div>
             </div>
         </td>
         <td>
@@ -917,14 +1237,8 @@ function createResponderRow(responder, index) {
                 <button class="action-btn" title="Update Status" onclick="openStatusModal('${responder.id}')">
                     <i class="fas fa-sync-alt"></i>
                 </button>
-                <button class="action-btn" title="Edit" onclick="editResponder('${responder.id}')">
-                    <i class="fas fa-edit"></i>
-                </button>
                 <button class="action-btn" title="View Details" onclick="viewResponderDetails('${responder.id}')">
                     <i class="fas fa-eye"></i>
-                </button>
-                <button class="action-btn danger" title="Remove" onclick="removeResponder('${responder.id}')">
-                    <i class="fas fa-trash"></i>
                 </button>
             </div>
         </td>
@@ -993,8 +1307,7 @@ function searchResponders(event) {
         return (
             (responder.name && responder.name.toLowerCase().includes(searchTerm)) ||
             (responder.unit && responder.unit.toLowerCase().includes(searchTerm)) ||
-            (responder.contact && responder.contact.toLowerCase().includes(searchTerm)) ||
-            (responder.email && responder.email.toLowerCase().includes(searchTerm))
+            (responder.contact && responder.contact.toLowerCase().includes(searchTerm))
         );
     });
     
@@ -1044,17 +1357,7 @@ function sortTable(column) {
     logActivity(`Sorted by ${column} (${sortDirection})`, 'info', 'fas fa-sort');
 }
 
-/* ---------------- MODAL FUNCTIONS ---------------- */
-window.addNewResponder = function() {
-    document.getElementById('add-responder-modal').style.display = 'flex';
-    logActivity('Opened add responder modal', 'info', 'fas fa-plus');
-};
-
-window.closeAddResponderModal = function() {
-    document.getElementById('add-responder-modal').style.display = 'none';
-    logActivity('Closed add responder modal', 'info', 'fas fa-times');
-};
-
+/* ---------------- RESPONDER MANAGEMENT FUNCTIONS ---------------- */
 window.openStatusModal = function(responderId) {
     const responder = allResponders.find(r => r.id === responderId);
     if (responder) {
@@ -1078,86 +1381,13 @@ window.selectStatus = function(status) {
             responder.updated_at = new Date().toISOString();
             updateRespondersTable();
             updateStats();
+            updateDashboard();
             closeStatusModal();
             
             showNotification(`Status updated to "${status}"`, 'success');
             logActivity(`Changed responder status from ${oldStatus} to ${status}`, 'info', 'fas fa-exchange-alt');
             logAudit(currentUser?.email || 'Admin', 'update_status', 
                     `Changed ${responder.name} status to ${status}`, 'responders');
-        }
-    }
-};
-
-/* ---------------- RESPONDER MANAGEMENT FUNCTIONS ---------------- */
-window.saveNewResponder = async function() {
-    const name = document.getElementById('responder-name').value.trim();
-    const unit = document.getElementById('responder-unit').value.trim();
-    const contact = document.getElementById('responder-contact').value.trim();
-    const email = document.getElementById('responder-email').value.trim();
-    const badge = document.getElementById('responder-badge').value.trim();
-    const status = document.getElementById('responder-status').value;
-    const skills = document.getElementById('responder-skills').value.trim();
-    const notes = document.getElementById('responder-notes').value.trim();
-    
-    if (!name || !unit || !contact) {
-        showNotification('Please fill in all required fields: Name, Unit, and Contact', 'error');
-        return;
-    }
-    
-    try {
-        const newResponder = {
-            id: `resp_${Date.now()}`,
-            name: name,
-            unit: unit,
-            contact: contact,
-            email: email || null,
-            badge: badge || null,
-            status: status,
-            skills: skills || null,
-            notes: notes || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-        
-        allResponders.unshift(newResponder);
-        updateRespondersTable();
-        updateStats();
-        closeAddResponderModal();
-        
-        // Clear form
-        document.getElementById('responder-name').value = '';
-        document.getElementById('responder-unit').value = '';
-        document.getElementById('responder-contact').value = '';
-        document.getElementById('responder-email').value = '';
-        document.getElementById('responder-badge').value = '';
-        document.getElementById('responder-status').value = 'Available';
-        document.getElementById('responder-skills').value = '';
-        document.getElementById('responder-notes').value = '';
-        
-        showNotification('Responder added successfully!', 'success');
-        logActivity(`Added new responder: ${name}`, 'success', 'fas fa-user-plus');
-        logAudit(currentUser?.email || 'Admin', 'create_responder', 
-                `Created responder: ${name} (${unit})`, 'responders');
-        
-    } catch (error) {
-        console.error('Error adding responder:', error);
-        showNotification('Error adding responder: ' + error.message, 'error');
-    }
-};
-
-window.editResponder = function(id) {
-    const responder = allResponders.find(r => r.id === id);
-    if (responder) {
-        const newName = prompt(`Edit responder name:`, responder.name || '');
-        if (newName !== null && newName.trim() !== '') {
-            const oldName = responder.name;
-            responder.name = newName;
-            responder.updated_at = new Date().toISOString();
-            updateRespondersTable();
-            showNotification('Responder name updated', 'success');
-            logActivity(`Edited responder from ${oldName} to ${newName}`, 'info', 'fas fa-edit');
-            logAudit(currentUser?.email || 'Admin', 'edit_responder', 
-                    `Updated responder name from ${oldName} to ${newName}`, 'responders');
         }
     }
 };
@@ -1169,32 +1399,14 @@ window.viewResponderDetails = function(id) {
         if (responder.report_id) {
             const report = allReports.find(r => r.id == responder.report_id);
             if (report) {
-                reportInfo = `\nAssigned to Report: #${report.id}\nReport Type: ${report.type_display || report.type}\nReport Status: ${report.status}`;
+                reportInfo = `\n\nAssigned to Report: #${report.id}\nReport Type: ${report.type_display || report.type}\nReport Status: ${report.status}\nReport Time: ${new Date(report.created_at).toLocaleString()}`;
             }
         }
         
-        const details = `Responder Details:\n\nName: ${responder.name}\nUnit: ${responder.unit}\nContact: ${responder.contact}\nEmail: ${responder.email || 'N/A'}\nBadge ID: ${responder.badge || 'N/A'}\nStatus: ${responder.status}\nSkills: ${responder.skills || 'N/A'}\nNotes: ${responder.notes || 'N/A'}\nLast Updated: ${responder.updated_at ? new Date(responder.updated_at).toLocaleString() : 'Unknown'}${reportInfo}`;
+        const details = `Responder Details:\n\nName: ${responder.name}\nUnit: ${responder.unit}\nContact: ${responder.contact}\nStatus: ${responder.status}\nCreated: ${responder.created_at ? new Date(responder.created_at).toLocaleString() : 'Unknown'}\nLast Updated: ${responder.updated_at ? new Date(responder.updated_at).toLocaleString() : 'Unknown'}${reportInfo}`;
         
         alert(details);
         logActivity(`Viewed details for ${responder.name}`, 'info', 'fas fa-eye');
-    }
-};
-
-window.removeResponder = function(id) {
-    const responder = allResponders.find(r => r.id === id);
-    if (!responder) return;
-    
-    if (confirm(`Are you sure you want to remove responder "${responder.name}"?`)) {
-        const index = allResponders.findIndex(r => r.id === id);
-        if (index > -1) {
-            allResponders.splice(index, 1);
-            updateRespondersTable();
-            updateStats();
-            showNotification('Responder removed successfully', 'success');
-            logActivity(`Removed responder: ${responder.name}`, 'warning', 'fas fa-trash');
-            logAudit(currentUser?.email || 'Admin', 'delete_responder', 
-                    `Removed responder: ${responder.name}`, 'responders');
-        }
     }
 };
 
@@ -1205,12 +1417,11 @@ window.exportResponders = function() {
     }
     
     // Create CSV content
-    const headers = ['Name', 'Unit', 'Contact', 'Email', 'Status', 'Last Updated'];
+    const headers = ['Name', 'Unit', 'Contact', 'Status', 'Last Updated'];
     const rows = allResponders.map(r => [
         r.name || '',
         r.unit || '',
         r.contact || '',
-        r.email || '',
         r.status || '',
         r.updated_at ? new Date(r.updated_at).toLocaleString() : ''
     ]);
@@ -1238,7 +1449,7 @@ window.exportResponders = function() {
 };
 
 window.filterByStatus = function(status) {
-    const statusOptions = ['Available', 'On Duty', 'Assigned', 'Busy', 'On Call', 'Off Duty'];
+    const statusOptions = ['Available', 'Assigned', 'On Duty'];
     const selectedStatus = prompt(`Enter status to filter by:\n${statusOptions.join(', ')}`, status);
     
     if (selectedStatus && statusOptions.includes(selectedStatus)) {
@@ -1269,6 +1480,7 @@ function getStatusClass(status) {
     const statusMap = {
         'pending': 'status-pending',
         'investigating': 'status-investigating',
+        'assigned': 'status-assigned',
         'resolved': 'status-resolved',
         'cancelled': 'status-cancelled',
         'submitted': 'status-pending'
@@ -1280,6 +1492,7 @@ function getStatusText(status) {
     const statusMap = {
         'pending': 'Pending',
         'investigating': 'Investigating',
+        'assigned': 'Assigned',
         'resolved': 'Resolved',
         'cancelled': 'Cancelled',
         'submitted': 'Submitted'
@@ -1287,98 +1500,28 @@ function getStatusText(status) {
     return statusMap[status] || 'Pending';
 }
 
-/* ---------------- GEOCODING FUNCTIONS ---------------- */
-async function getLocationName(lat, lng) {
-    const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+function formatTimeAgo(date) {
+    if (!date) return 'Unknown';
     
-    if (locationCache.has(cacheKey)) {
-        return locationCache.get(cacheKey);
-    }
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
-    try {
-        const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${OPENCAGE_API_KEY}&language=en&pretty=1&no_annotations=1`;
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'AidTracker-Admin/1.0'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Geocoding API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (!data.results || data.results.length === 0) {
-            throw new Error('No address data returned');
-        }
-        
-        const result = data.results[0];
-        const components = result.components;
-        
-        let locationParts = [];
-        
-        if (components.road) locationParts.push(components.road);
-        if (components.village) locationParts.push(components.village);
-        if (components.suburb) locationParts.push(components.suburb);
-        if (components.neighbourhood) locationParts.push(components.neighbourhood);
-        if (components.town) locationParts.push(components.town);
-        if (components.city) locationParts.push(components.city);
-        if (components.municipality) locationParts.push(components.municipality);
-        if (components.state) locationParts.push(components.state);
-        if (components.country) locationParts.push(components.country);
-        
-        let finalAddress = '';
-        
-        if (locationParts.length > 0) {
-            const uniqueParts = [...new Set(locationParts)];
-            finalAddress = uniqueParts.join(', ');
-        } else if (result.formatted) {
-            finalAddress = result.formatted;
-        } else {
-            finalAddress = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        }
-        
-        locationCache.set(cacheKey, finalAddress);
-        return finalAddress;
-        
-    } catch (error) {
-        console.warn('Reverse geocoding failed:', error);
-        const fallbackAddress = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        locationCache.set(cacheKey, fallbackAddress);
-        return fallbackAddress;
+    if (diffMins < 1) {
+        return 'Just now';
+    } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+    } else if (diffDays < 7) {
+        return `${diffDays}d ago`;
+    } else {
+        return date.toLocaleDateString();
     }
 }
 
-async function formatLocation(report) {
-    if (report.location && report.location.trim() !== '') {
-        return report.location;
-    }
-    
-    if (report.latitude && report.longitude) {
-        try {
-            const lat = parseFloat(report.latitude);
-            const lng = parseFloat(report.longitude);
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-                return await getLocationName(lat, lng);
-            }
-        } catch (error) {
-            console.warn(`Could not get address for report ${report.id}:`, error);
-        }
-    }
-    
-    if (report.latitude && report.longitude) {
-        return `${parseFloat(report.latitude).toFixed(4)}, ${parseFloat(report.longitude).toFixed(4)}`;
-    }
-    
-    return 'Unknown location';
-}
-
-/* ---------------- UTILITY FUNCTIONS ---------------- */
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -1405,87 +1548,6 @@ function showNotification(message, type = 'info') {
             <i class="fas fa-times"></i>
         </button>
     `;
-    
-    // Add styles if not already added
-    if (!document.querySelector('#notification-styles')) {
-        const styles = document.createElement('style');
-        styles.id = 'notification-styles';
-        styles.textContent = `
-            .notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 16px 20px;
-                border-radius: var(--radius-md);
-                background: white;
-                box-shadow: var(--shadow-lg);
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                min-width: 300px;
-                transform: translateX(400px);
-                transition: transform 0.3s ease;
-                z-index: 9999;
-                border-left: 4px solid;
-            }
-            
-            .notification.show {
-                transform: translateX(0);
-            }
-            
-            .notification.success {
-                border-left-color: var(--success);
-            }
-            
-            .notification.error {
-                border-left-color: var(--danger);
-            }
-            
-            .notification.info {
-                border-left-color: var(--primary);
-            }
-            
-            .notification.warning {
-                border-left-color: var(--warning);
-            }
-            
-            .notification i {
-                font-size: 20px;
-            }
-            
-            .notification.success i {
-                color: var(--success);
-            }
-            
-            .notification.error i {
-                color: var(--danger);
-            }
-            
-            .notification.info i {
-                color: var(--primary);
-            }
-            
-            .notification.warning i {
-                color: var(--warning);
-            }
-            
-            .notification-close {
-                margin-left: auto;
-                background: none;
-                border: none;
-                cursor: pointer;
-                opacity: 0.6;
-                padding: 4px;
-                border-radius: 4px;
-            }
-            
-            .notification-close:hover {
-                opacity: 1;
-                background: rgba(0,0,0,0.05);
-            }
-        `;
-        document.head.appendChild(styles);
-    }
     
     // Add to document
     document.body.appendChild(notification);
@@ -1718,6 +1780,7 @@ function updateSystemActivityStats() {
     // Update active users count
     const activeUsersEl = document.getElementById('active-users-count');
     if (activeUsersEl) {
+        // In a real system, you'd track active sessions
         activeUsersEl.textContent = '1';
     }
     
@@ -1792,7 +1855,7 @@ function showSessionWarning(minutesLeft) {
 
 /* ---------------- AUDIT PAGINATION FUNCTIONS ---------------- */
 function changeAuditRowsPerPage(value) {
-    auditRowsPerPage = value;
+    auditRowsPerPage = parseInt(value);
     auditCurrentPage = 1;
     updateAuditLogsTable();
 }
@@ -1920,13 +1983,23 @@ window.viewReport = async function(id) {
         let reporterName = report.reporter || 'Anonymous';
         
         if (typeof reporterName === 'string' && reporterName.includes('@')) {
-            const user = allUsers.find(u => u.email === reporterName);
+            const user = allUsers.find(u => u.email?.toLowerCase() === reporterName.toLowerCase());
             if (user && (user.full_name || user.name)) {
                 reporterName = user.full_name || user.name || reporterName;
             }
         }
         
-        const location = await formatLocation(report);
+        // Format location
+        let location = 'Unknown location';
+        if (report.location && report.location.trim() !== '') {
+            location = report.location;
+        } else if (report.latitude && report.longitude) {
+            const lat = parseFloat(report.latitude);
+            const lng = parseFloat(report.longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                location = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            }
+        }
         
         let responderInfo = '';
         if (report.assigned_responders) {
@@ -1955,7 +2028,7 @@ window.updateReportStatus = function(id) {
         return;
     }
     
-    const statusOptions = ['pending', 'investigating', 'resolved', 'cancelled'];
+    const statusOptions = ['pending', 'investigating', 'assigned', 'resolved', 'cancelled'];
     const newStatus = prompt(`Enter new status for report #${id}\nOptions: ${statusOptions.join(', ')}`, report.status || 'pending');
     
     if (newStatus && statusOptions.includes(newStatus.toLowerCase())) {
@@ -1990,7 +2063,7 @@ window.viewUser = function(id) {
     if (user) {
         const userReports = allReports.filter(r => {
             const reporterEmail = r.reporter;
-            return (reporterEmail && user.email && reporterEmail === user.email);
+            return (reporterEmail && user.email && reporterEmail.toLowerCase() === user.email.toLowerCase());
         }).length;
 
         const details = `User Details:\n\nName: ${user.full_name || user.name || 'Unknown'}\nEmail: ${user.email || 'No email'}\nRole: ${user.role || 'Citizen'}\nReports Submitted: ${userReports}\nJoined: ${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}`;
@@ -2003,8 +2076,6 @@ window.viewUser = function(id) {
         alert('User not found');
     }
 };
-
-
 
 /* ---------------- ANALYTICS FUNCTIONS ---------------- */
 function updateAnalytics() {
@@ -2040,10 +2111,10 @@ function updateAnalytics() {
 function updateAnalyticsMetrics(reports, users, days) {
     // Reports trend
     const currentPeriod = reports.length;
+    const previousCutoff = new Date();
+    previousCutoff.setDate(previousCutoff.getDate() - (days * 2));
     const previousPeriod = allReports.filter(r => {
         const reportDate = new Date(r.created_at);
-        const previousCutoff = new Date();
-        previousCutoff.setDate(previousCutoff.getDate() - (days * 2));
         return reportDate >= previousCutoff && reportDate < new Date(Date.now() - (days * 24 * 60 * 60 * 1000));
     }).length;
 
@@ -2054,21 +2125,30 @@ function updateAnalyticsMetrics(reports, users, days) {
     if (trendEl) trendEl.textContent = `${trend >= 0 ? '+' : ''}${trend}%`;
     if (countEl) countEl.textContent = `${currentPeriod} reports this period`;
 
-    // Average response time (mock calculation)
+    // Average response time
     const avgResponseEl = document.getElementById('avg-response-time');
     if (avgResponseEl) {
-        const avgTime = reports.length > 0 ? Math.floor(Math.random() * 20) + 5 : 4.2;
+        const avgTime = calculateAverageResponseTime();
         avgResponseEl.textContent = `${avgTime}m`;
     }
 
     // User engagement (active users ratio)
     const engagementEl = document.getElementById('user-engagement');
     if (engagementEl) {
-        const engagement = users.length > 0 ? Math.min(95, Math.floor((users.length / Math.max(allUsers.length, 1)) * 100)) : 85;
+        // Calculate engagement based on users who submitted reports
+        const activeUsers = new Set();
+        allReports.forEach(report => {
+            if (report.reporter) {
+                activeUsers.add(report.reporter.toLowerCase());
+            }
+        });
+        
+        const totalUsers = allUsers.length;
+        const engagement = totalUsers > 0 ? Math.min(95, Math.round((activeUsers.size / totalUsers) * 100)) : 0;
         engagementEl.textContent = `${engagement}%`;
     }
 
-    // System uptime (mock)
+    // System uptime (mock - in real system this would come from monitoring)
     const uptimeEl = document.getElementById('system-uptime');
     if (uptimeEl) uptimeEl.textContent = '99.9%';
 }
@@ -2076,6 +2156,11 @@ function updateAnalyticsMetrics(reports, users, days) {
 function updateReportsTypeChart(reports) {
     const canvas = document.getElementById('reports-type-chart');
     if (!canvas) return;
+
+    // Destroy existing chart if it exists
+    if (reportsTypeChart) {
+        reportsTypeChart.destroy();
+    }
 
     const ctx = canvas.getContext('2d');
 
@@ -2089,61 +2174,8 @@ function updateReportsTypeChart(reports) {
     const labels = Object.keys(typeCounts);
     const data = Object.values(typeCounts);
 
-    // Simple pie chart implementation
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = Math.min(centerX, centerY) - 20;
-
-    let startAngle = 0;
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (data.length === 0) {
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillText('No data available', centerX, centerY);
-        return;
-    }
-
-    const total = data.reduce((sum, value) => sum + value, 0);
-
-    data.forEach((value, index) => {
-        const sliceAngle = (value / total) * 2 * Math.PI;
-        const endAngle = startAngle + sliceAngle;
-
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-        ctx.closePath();
-        ctx.fillStyle = colors[index % colors.length];
-        ctx.fill();
-
-        startAngle = endAngle;
-    });
-
-    // Add legend
-    ctx.font = '12px Inter';
-    ctx.textAlign = 'left';
-    labels.forEach((label, index) => {
-        const x = 20;
-        const y = 30 + (index * 20);
-        ctx.fillStyle = colors[index % colors.length];
-        ctx.fillRect(x, y - 10, 12, 12);
-        ctx.fillStyle = '#0f172a';
-        ctx.fillText(`${label}: ${data[index]}`, x + 16, y);
-    });
-}
-
-function updateReportsTimelineChart(reports, days) {
-    const canvas = document.getElementById('reports-timeline-chart');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (reports.length === 0) {
+    if (labels.length === 0) {
+        // Create a default chart with "No data" message
         ctx.fillStyle = '#94a3b8';
         ctx.font = '14px Inter';
         ctx.textAlign = 'center';
@@ -2151,49 +2183,123 @@ function updateReportsTimelineChart(reports, days) {
         return;
     }
 
+    reportsTypeChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: [
+                    '#3b82f6', // Blue
+                    '#10b981', // Green
+                    '#f59e0b', // Yellow
+                    '#ef4444', // Red
+                    '#8b5cf6', // Purple
+                    '#06b6d4', // Cyan
+                    '#f97316', // Orange
+                    '#84cc16'  // Lime
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateReportsTimelineChart(reports, days) {
+    const canvas = document.getElementById('reports-timeline-chart');
+    if (!canvas) return;
+
+    // Destroy existing chart if it exists
+    if (reportsTimelineChart) {
+        reportsTimelineChart.destroy();
+    }
+
+    const ctx = canvas.getContext('2d');
+
     // Group reports by date
     const dateGroups = {};
     reports.forEach(report => {
-        const date = new Date(report.created_at).toDateString();
+        const date = new Date(report.created_at).toLocaleDateString();
         dateGroups[date] = (dateGroups[date] || 0) + 1;
     });
 
     const dates = Object.keys(dateGroups).sort();
     const counts = dates.map(date => dateGroups[date]);
 
-    // Simple line chart
-    const padding = 40;
-    const chartWidth = canvas.width - (padding * 2);
-    const chartHeight = canvas.height - (padding * 2);
+    if (dates.length === 0) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
 
-    const maxCount = Math.max(...counts, 1);
-
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
-    dates.forEach((date, index) => {
-        const x = padding + (index / (dates.length - 1 || 1)) * chartWidth;
-        const y = canvas.height - padding - (counts[index] / maxCount) * chartHeight;
-
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
+    reportsTimelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Reports',
+                data: counts,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
         }
-    });
-
-    ctx.stroke();
-
-    // Add points
-    ctx.fillStyle = '#3b82f6';
-    dates.forEach((date, index) => {
-        const x = padding + (index / (dates.length - 1 || 1)) * chartWidth;
-        const y = canvas.height - padding - (counts[index] / maxCount) * chartHeight;
-
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 2 * Math.PI);
-        ctx.fill();
     });
 }
 
@@ -2201,20 +2307,33 @@ function updateLocationChart(reports) {
     const canvas = document.getElementById('location-chart');
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Destroy existing chart if it exists
+    if (locationChart) {
+        locationChart.destroy();
+    }
 
-    // Count reports by location
+    const ctx = canvas.getContext('2d');
+
+    // Count reports by location (simplified)
     const locationCounts = {};
     reports.forEach(report => {
-        const location = report.location || 'Unknown';
+        let location = 'Unknown';
+        if (report.location && report.location.trim() !== '') {
+            // Take first part of location for simplicity
+            location = report.location.split(',')[0].trim();
+        }
         locationCounts[location] = (locationCounts[location] || 0) + 1;
     });
 
-    const locations = Object.keys(locationCounts).slice(0, 5); // Top 5
-    const counts = locations.map(loc => locationCounts[loc]);
+    // Sort by count and take top 5
+    const sortedLocations = Object.entries(locationCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
 
-    if (locations.length === 0) {
+    const labels = sortedLocations.map(([location]) => location);
+    const data = sortedLocations.map(([, count]) => count);
+
+    if (labels.length === 0) {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '14px Inter';
         ctx.textAlign = 'center';
@@ -2222,24 +2341,40 @@ function updateLocationChart(reports) {
         return;
     }
 
-    // Simple bar chart
-    const padding = 40;
-    const barWidth = (canvas.width - (padding * 2)) / locations.length;
-    const maxCount = Math.max(...counts, 1);
-
-    locations.forEach((location, index) => {
-        const x = padding + (index * barWidth);
-        const barHeight = (counts[index] / maxCount) * (canvas.height - padding * 2);
-        const y = canvas.height - padding - barHeight;
-
-        ctx.fillStyle = '#10b981';
-        ctx.fillRect(x, y, barWidth - 10, barHeight);
-
-        // Label
-        ctx.fillStyle = '#0f172a';
-        ctx.font = '10px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillText(location.substring(0, 10), x + (barWidth - 10) / 2, canvas.height - 10);
+    locationChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Reports',
+                data: data,
+                backgroundColor: '#10b981',
+                borderColor: '#10b981',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -2247,23 +2382,79 @@ function updateUserActivityChart(users, days) {
     const canvas = document.getElementById('user-activity-chart');
     if (!canvas) return;
 
+    // Destroy existing chart if it exists
+    if (userActivityChart) {
+        userActivityChart.destroy();
+    }
+
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Mock user activity data
-    const activityData = [12, 19, 15, 25, 22, 30, 28];
+    // Create sample data for user activity (in a real system, this would be actual user activity data)
+    const activityData = [];
+    const now = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { weekday: 'short' });
+        
+        // Count users created on this day
+        const usersOnDay = users.filter(u => {
+            const userDate = new Date(u.created_at);
+            return userDate.toDateString() === date.toDateString();
+        }).length;
+        
+        activityData.push({
+            day: dateStr,
+            count: usersOnDay
+        });
+    }
 
-    const padding = 40;
-    const barWidth = (canvas.width - (padding * 2)) / activityData.length;
-    const maxActivity = Math.max(...activityData, 1);
+    const labels = activityData.map(d => d.day);
+    const data = activityData.map(d => d.count);
 
-    activityData.forEach((activity, index) => {
-        const x = padding + (index * barWidth);
-        const barHeight = (activity / maxActivity) * (canvas.height - padding * 2);
-        const y = canvas.height - padding - barHeight;
+    if (data.every(d => d === 0)) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('No activity data', canvas.width / 2, canvas.height / 2);
+        return;
+    }
 
-        ctx.fillStyle = '#8b5cf6';
-        ctx.fillRect(x, y, barWidth - 10, barHeight);
+    userActivityChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'User Activity',
+                data: data,
+                backgroundColor: '#8b5cf6',
+                borderColor: '#8b5cf6',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -2278,13 +2469,60 @@ function updateTopRespondersTable() {
         return;
     }
 
-    // Sort by reports handled (mock data)
-    const topResponders = allResponders.slice(0, 5).map(responder => ({
-        ...responder,
-        reportsHandled: Math.floor(Math.random() * 50) + 1,
-        avgResponseTime: `${Math.floor(Math.random() * 30) + 5}m`,
-        successRate: `${Math.floor(Math.random() * 20) + 80}%`
-    }));
+    // Calculate statistics for responders based on reports
+    const responderStats = allResponders.map(responder => {
+        // Find reports assigned to this responder
+        const assignedReports = allReports.filter(report =>
+            report.assigned_responders &&
+            report.assigned_responders.toLowerCase().includes(responder.name.toLowerCase())
+        );
+
+        const reportsHandled = assignedReports.length;
+
+        // Calculate average response time
+        let totalResponseTime = 0;
+        let responseCount = 0;
+
+        assignedReports.forEach(report => {
+            if (report.created_at && report.updated_at) {
+                const created = new Date(report.created_at);
+                const updated = new Date(report.updated_at);
+                const responseTime = (updated - created) / (1000 * 60); // minutes
+                if (responseTime > 0 && responseTime < 1440) { // Less than 24 hours
+                    totalResponseTime += responseTime;
+                    responseCount++;
+                }
+            }
+        });
+
+        const avgResponseTime = responseCount > 0 ? Math.round(totalResponseTime / responseCount) : 0;
+        const avgResponseTimeStr = avgResponseTime > 0 ? `${avgResponseTime}m` : 'N/A';
+
+        // Calculate success rate (reports that are resolved)
+        const resolvedReports = assignedReports.filter(report =>
+            report.status === 'resolved' || report.status === 'completed'
+        ).length;
+        const successRate = reportsHandled > 0 ? Math.round((resolvedReports / reportsHandled) * 100) : 0;
+        const successRateStr = `${successRate}%`;
+
+        return {
+            ...responder,
+            reportsHandled,
+            avgResponseTime: avgResponseTimeStr,
+            successRate: successRateStr
+        };
+    });
+
+    // Sort by reports handled (descending)
+    responderStats.sort((a, b) => b.reportsHandled - a.reportsHandled);
+
+    // Take top 5
+    const topResponders = responderStats.slice(0, 5);
+
+    if (topResponders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">No responder data available</td></tr>';
+        return;
+    }
 
     topResponders.forEach(responder => {
         const row = document.createElement('tr');
@@ -2314,9 +2552,14 @@ function updateStatusDistributionTable(reports) {
 
     const total = reports.length;
 
+    if (total === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;">No report data available</td></tr>';
+        return;
+    }
+
     Object.entries(statusCounts).forEach(([status, count]) => {
         const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
-        const avgTime = `${Math.floor(Math.random() * 60) + 10}m`; // Mock
+        const avgTime = calculateAverageResolutionTime(status);
 
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -2329,6 +2572,40 @@ function updateStatusDistributionTable(reports) {
     });
 }
 
+function calculateAverageResolutionTime(status) {
+    if (status !== 'resolved') return 'N/A';
+    
+    const resolvedReports = allReports.filter(r => r.status === 'resolved');
+    if (resolvedReports.length === 0) return 'N/A';
+    
+    let totalTime = 0;
+    let count = 0;
+    
+    resolvedReports.forEach(report => {
+        if (report.created_at && report.updated_at) {
+            const created = new Date(report.created_at);
+            const updated = new Date(report.updated_at);
+            const diffHours = (updated - created) / (1000 * 60 * 60);
+            
+            if (diffHours > 0 && diffHours < 168) { // Less than 7 days
+                totalTime += diffHours;
+                count++;
+            }
+        }
+    });
+    
+    if (count === 0) return 'N/A';
+    
+    const avgHours = totalTime / count;
+    if (avgHours < 1) {
+        return `${Math.round(avgHours * 60)}m`;
+    } else if (avgHours < 24) {
+        return `${Math.round(avgHours)}h`;
+    } else {
+        return `${Math.round(avgHours / 24)}d`;
+    }
+}
+
 function exportAnalytics() {
     // Create a simple analytics report
     const report = {
@@ -2337,6 +2614,8 @@ function exportAnalytics() {
         totalReports: allReports.length,
         totalUsers: allUsers.length,
         totalResponders: allResponders.length,
+        avgResponseTime: `${calculateAverageResponseTime()}m`,
+        resolutionRate: calculateResolutionRate(),
         systemUptime: '99.9%'
     };
 
@@ -2353,6 +2632,12 @@ function exportAnalytics() {
 
     showNotification('Analytics report exported', 'success');
     logActivity('Exported analytics report', 'success', 'fas fa-download');
+}
+
+function calculateResolutionRate() {
+    const resolvedReports = allReports.filter(r => r.status === 'resolved').length;
+    const total = allReports.length;
+    return total > 0 ? Math.round((resolvedReports / total) * 100) : 0;
 }
 
 /* ---------------- SETTINGS FUNCTIONS ---------------- */
@@ -2389,7 +2674,7 @@ function loadSettings() {
     if (twoFactorEl) twoFactorEl.checked = settings.twoFactorAuth || false;
 
     const auditLoggingEl = document.getElementById('audit-logging');
-    if (auditLoggingEl) auditLoggingEl.checked = settings.auditLogging !== false; // Default true
+    if (auditLoggingEl) auditLoggingEl.checked = settings.auditLogging !== false;
 
     const ipWhitelistEl = document.getElementById('ip-whitelist');
     if (ipWhitelistEl) ipWhitelistEl.checked = settings.ipWhitelist || false;
@@ -2532,8 +2817,6 @@ window.login = login;
 window.logout = logout;
 window.selectStatus = selectStatus;
 window.closeStatusModal = closeStatusModal;
-window.closeAddResponderModal = closeAddResponderModal;
-window.saveNewResponder = saveNewResponder;
 window.filterByStatus = filterByStatus;
 window.refreshSystemActivity = refreshSystemActivity;
 window.exportActivityLog = exportActivityLog;
@@ -2553,5 +2836,10 @@ window.saveSettings = saveSettings;
 window.resetSettings = resetSettings;
 window.exportAllData = exportAllData;
 window.clearOldData = clearOldData;
+window.viewReport = viewReport;
+window.updateReportStatus = updateReportStatus;
+window.viewUser = viewUser;
+window.viewResponderDetails = viewResponderDetails;
+window.exportResponders = exportResponders;
 
 console.log('Admin JavaScript loaded successfully!');
