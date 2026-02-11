@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AidTracker — Admin Dashboard</title>
+
+<!-- Include Supabase client library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Include Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Include CSS -->
+<link rel="stylesheet" href="admin.css">
+
+<!-- Include JavaScript -->
+<script src="admin.js" defer></script>
+</head>
+
+<body>
+<!-- Phone Restriction Message -->
+<div id="phone-message">
+  <div class="phone-message-content">
+    <h1>Access Restricted</h1>
+    <p>This website is only accessible on tablets and iPads. Please use a tablet or iPad to access this site.</p>
+  </div>
+</div>
+
+<!-- Login Modal -->
+<div id="login-modal" class="modal-overlay">
+  <div class="modal-dialog small">
+    <div class="modal-header">
+      <h3><i class="fas fa-shield-alt"></i> Admin Login</h3>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="login-email">Email</label>
+        <div class="input-with-icon">
+          <i class="fas fa-envelope"></i>
+          <input id="login-email" type="email" placeholder="Enter your email" class="form-input" value="superadmin@gmail.com">
+        </div>
+      </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <div class="input-with-icon">
+            <i class="fas fa-lock"></i>
+            <input id="login-password" type="password" placeholder="Enter your password" class="form-input" value="SuperAdmin1234!">
+            <i class="fas fa-eye" id="password-toggle" style="right: 12px; left: auto; cursor: pointer;"></i>
+          </div>
+        </div>
+      <div id="login-error" class="error-message"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" onclick="login()">
+        <i class="fas fa-sign-in-alt"></i> Login
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div class="app" id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">
+        <i class="fas fa-shield-alt"></i>
+      </div>
+      <div class="brand-text">
+        <h1>AidTracker</h1>
+        <div class="muted">Admin Console</div>
+      </div>
+      <button class="sidebar-toggle" id="sidebar-toggle">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar" id="user-avatar">AD</div>
+      <div>
+        <div class="user-name" id="user-name">Admin User</div>
+        <div class="user-role" id="user-role">Administrator</div>
+      </div>
+    </div>
+
+    <nav class="nav" role="navigation">
+      <div class="nav-section">
+        <div class="nav-label">MAIN</div>
+        <button id="btn-dashboard" data-target="dashboard" class="nav-item">
+          <i class="fas fa-chart-pie"></i>
+          <span>Dashboard</span>
+          <div class="notification-badge">3</div>
+        </button>
+        <button id="btn-responders" class="nav-item active" data-target="responders">
+          <i class="fas fa-user-shield"></i>
+          <span>Responders</span>
+          <div class="notification-badge">12</div>
+        </button>
+        <button id="btn-reports" data-target="reports" class="nav-item">
+          <i class="fas fa-file-medical-alt"></i>
+          <span>Reports</span>
+          <div class="notification-badge">8</div>
+        </button>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-label">MANAGEMENT</div>
+        <button id="btn-users" data-target="users" class="nav-item">
+          <i class="fas fa-users-cog"></i>
+          <span>User Management</span>
+        </button>
+        <button id="btn-analytics" class="nav-item" data-target="analytics">
+          <i class="fas fa-chart-bar"></i>
+          <span>Analytics</span>
+        </button>
+        <button id="btn-settings" class="nav-item" data-target="settings">
+          <i class="fas fa-cog"></i>
+          <span>Settings</span>
+        </button>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">MONITORING</div>
+        <button id="btn-system-activity" class="nav-item" data-target="system-activity">
+          <i class="fas fa-chart-line"></i>
+          <span>System Activity</span>
+        </button>
+        <button id="btn-audit-logs" class="nav-item" data-target="audit-logs">
+          <i class="fas fa-history"></i>
+          <span>Audit Logs</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="system-status">
+        <div class="status-indicator active"></div>
+        <span>System Online</span>
+      </div>
+      <button class="btn logout-btn" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i>
+        <span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+    <header class="main-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div>
+          <h1>Responder Management</h1>
+          <div class="breadcrumb">
+            <span>Dashboard</span>
+            <i class="fas fa-chevron-right"></i>
+            <span class="active">Responders</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <div class="header-actions">
+          <button class="header-action" title="Notifications">
+            <i class="fas fa-bell"></i>
+            <span class="badge">5</span>
+          </button>
+          <button class="header-action" title="Search">
+            <i class="fas fa-search"></i>
+          </button>
+          <button class="header-action" title="Help">
+            <i class="fas fa-question-circle"></i>
+          </button>
+        </div>
+        <div class="time-display" id="data-updated">
+          <i class="fas fa-sync-alt"></i>
+          <span>Updated just now</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Stats Overview -->
+    <section class="stats-overview">
+      <div class="stat-card">
+        <div class="stat-icon primary">
+          <i class="fas fa-user-shield"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value" id="total-responders">0</div>
+          <div class="stat-label">Total Responders</div>
+        </div>
+        <div class="stat-trend positive">
+          <i class="fas fa-arrow-up"></i>
+          <span>12%</span>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon success">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value" id="available-responders">0</div>
+          <div class="stat-label">Available Now</div>
+        </div>
+        <div class="stat-trend positive">
+          <i class="fas fa-arrow-up"></i>
+          <span>8%</span>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon warning">
+          <i class="fas fa-clock"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value" id="active-responders">0</div>
+          <div class="stat-label">Active Now</div>
+        </div>
+        <div class="stat-trend negative">
+          <i class="fas fa-arrow-down"></i>
+          <span>3%</span>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon info">
+          <i class="fas fa-map-marker-alt"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value" id="locations-covered">0</div>
+          <div class="stat-label">Locations Covered</div>
+        </div>
+        <div class="stat-trend positive">
+          <i class="fas fa-arrow-up"></i>
+          <span>5%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESPONDERS PANEL -->
+    <section id="responders" class="panel active">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Responder Directory</h2>
+          <p class="panel-subtitle">Manage and monitor emergency response personnel</p>
+        </div>
+        <div class="panel-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search responders..." id="responder-search">
+          </div>
+          <button class="btn secondary" onclick="filterByStatus('all')">
+            <i class="fas fa-filter"></i>
+            Filter
+          </button>
+          <button class="btn primary" onclick="addNewResponder()">
+            <i class="fas fa-plus"></i>
+            Add Responder
+          </button>
+          <button class="btn ghost" onclick="exportResponders()">
+            <i class="fas fa-download"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="checkbox-col">
+                <input type="checkbox" id="select-all">
+              </th>
+              <th onclick="sortTable('name')">
+                <span>Responder</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortTable('unit')">
+                <span>Unit / Department</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th>Contact Details</th>
+              <th onclick="sortTable('status')">
+                <span>Status</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortTable('lastActive')">
+                <span>Last Active</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="responders-table">
+            <tr>
+              <td colspan="7" class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading responders...</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <div class="footer-info">
+          <span>Showing <span id="showing-count">0</span> of <span id="total-count">0</span> responders</span>
+          <select id="rows-per-page" onchange="changeRowsPerPage(this.value)">
+            <option value="10">10 per page</option>
+            <option value="25" selected>25 per page</option>
+            <option value="50">50 per page</option>
+            <option value="100">100 per page</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <button class="pagination-btn" onclick="prevPage()" disabled>
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <div class="page-numbers">
+            <span class="page-number active">1</span>
+            <span class="page-number">2</span>
+            <span class="page-number">3</span>
+            <span class="dots">...</span>
+            <span class="page-number">10</span>
+          </div>
+          <button class="pagination-btn" onclick="nextPage()">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hidden panels -->
+    <section id="dashboard" class="panel">
+      <div class="panel-header">
+        <h2>Dashboard Overview</h2>
+      </div>
+      <div class="dashboard-content">
+        <div class="card-row">
+          <div class="card">
+            <div class="muted">Total Users</div>
+            <div class="count" id="total-users">0</div>
+          </div>
+          <div class="card">
+            <div class="muted">Active Reports</div>
+            <div class="count" id="active-reports">0</div>
+          </div>
+          <div class="card">
+            <div class="muted">Response Time</div>
+            <div class="count">4.2m</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANALYTICS PANEL -->
+    <section id="analytics" class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Analytics Dashboard</h2>
+          <p class="panel-subtitle">Comprehensive insights into system performance and user activity</p>
+        </div>
+        <div class="panel-actions">
+          <select id="analytics-timeframe" onchange="updateAnalytics()">
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="1y">Last Year</option>
+          </select>
+          <button class="btn ghost" onclick="exportAnalytics()">
+            <i class="fas fa-download"></i>
+            Export Report
+          </button>
+        </div>
+      </div>
+
+      <div class="analytics-content">
+        <!-- Key Metrics -->
+        <div class="analytics-metrics">
+          <div class="metric-card">
+            <div class="metric-icon primary">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="metric-content">
+              <div class="metric-value" id="reports-trend">+12%</div>
+              <div class="metric-label">Reports Trend</div>
+              <div class="metric-subtext" id="reports-count">0 reports this period</div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon success">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="metric-content">
+              <div class="metric-value" id="avg-response-time">4.2m</div>
+              <div class="metric-label">Avg Response Time</div>
+              <div class="metric-subtext">Across all reports</div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon warning">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="metric-content">
+              <div class="metric-value" id="user-engagement">85%</div>
+              <div class="metric-label">User Engagement</div>
+              <div class="metric-subtext">Active users ratio</div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon info">
+              <i class="fas fa-shield-alt"></i>
+            </div>
+            <div class="metric-content">
+              <div class="metric-value" id="system-uptime">99.9%</div>
+              <div class="metric-label">System Uptime</div>
+              <div class="metric-subtext">Last 30 days</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Reports by Type</h3>
+              <div class="chart-controls">
+                <button class="chart-toggle active" data-chart="pie">Pie</button>
+                <button class="chart-toggle" data-chart="bar">Bar</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="reports-type-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Reports Over Time</h3>
+              <div class="chart-controls">
+                <button class="chart-toggle active" data-chart="line">Line</button>
+                <button class="chart-toggle" data-chart="area">Area</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="reports-timeline-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Geographic Distribution</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="location-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>User Activity</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="user-activity-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Analytics Tables -->
+        <div class="analytics-tables">
+          <div class="table-section">
+            <h3>Top Performing Responders</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Responder</th>
+                    <th>Unit</th>
+                    <th>Reports Handled</th>
+                    <th>Avg Response Time</th>
+                    <th>Success Rate</th>
+                  </tr>
+                </thead>
+                <tbody id="top-responders-table">
+                  <tr>
+                    <td colspan="5" class="loading-state">
+                      <div class="spinner"></div>
+                      <span>Loading analytics data...</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="table-section">
+            <h3>Report Status Distribution</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                    <th>Avg Resolution Time</th>
+                  </tr>
+                </thead>
+                <tbody id="status-distribution-table">
+                  <tr>
+                    <td colspan="4" class="loading-state">
+                      <div class="spinner"></div>
+                      <span>Loading status data...</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS PANEL -->
+    <section id="settings" class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>System Settings</h2>
+          <p class="panel-subtitle">Configure system preferences and security options</p>
+        </div>
+        <div class="panel-actions">
+          <button class="btn secondary" onclick="resetSettings()">
+            <i class="fas fa-undo"></i>
+            Reset to Default
+          </button>
+          <button class="btn primary" onclick="saveSettings()">
+            <i class="fas fa-save"></i>
+            Save Changes
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-content">
+        <!-- General Settings -->
+        <div class="settings-section">
+          <h3><i class="fas fa-cogs"></i> General Settings</h3>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="app-name">Application Name</label>
+                <p>Display name for the application</p>
+              </div>
+              <input type="text" id="app-name" value="AidTracker" class="form-input">
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="default-language">Default Language</label>
+                <p>Primary language for the interface</p>
+              </div>
+              <select id="default-language" class="form-select">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="timezone">Timezone</label>
+                <p>System timezone for timestamps</p>
+              </div>
+              <select id="timezone" class="form-select">
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">Eastern Time</option>
+                <option value="America/Chicago">Central Time</option>
+                <option value="America/Denver">Mountain Time</option>
+                <option value="America/Los_Angeles">Pacific Time</option>
+                <option value="Asia/Manila" selected>Asia/Manila (PHT)</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="date-format">Date Format</label>
+                <p>Format for displaying dates</p>
+              </div>
+              <select id="date-format" class="form-select">
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security Settings -->
+        <div class="settings-section">
+          <h3><i class="fas fa-shield-alt"></i> Security Settings</h3>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="session-timeout">Session Timeout (minutes)</label>
+                <p>Auto-logout after inactivity</p>
+              </div>
+              <input type="number" id="session-timeout" value="30" min="5" max="480" class="form-input">
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="password-min-length">Minimum Password Length</label>
+                <p>Minimum characters required for passwords</p>
+              </div>
+              <input type="number" id="password-min-length" value="8" min="6" max="32" class="form-input">
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="max-login-attempts">Max Login Attempts</label>
+                <p>Failed attempts before account lockout</p>
+              </div>
+              <input type="number" id="max-login-attempts" value="5" min="3" max="10" class="form-input">
+            </div>
+
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="two-factor-auth">Enable Two-Factor Authentication</label>
+                <p>Add extra security layer for admin accounts</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="two-factor-auth">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="audit-logging">Enable Audit Logging</label>
+                <p>Log all user actions for security monitoring</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="audit-logging" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="ip-whitelist">IP Whitelist</label>
+                <p>Restrict access to specific IP addresses</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="ip-whitelist">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Settings -->
+        <div class="settings-section">
+          <h3><i class="fas fa-bell"></i> Notification Settings</h3>
+          <div class="settings-grid">
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="email-notifications">Email Notifications</label>
+                <p>Send email alerts for important events</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="email-notifications" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="sms-notifications">SMS Notifications</label>
+                <p>Send SMS alerts for critical incidents</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="sms-notifications">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="push-notifications">Push Notifications</label>
+                <p>Browser push notifications for real-time updates</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="push-notifications" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="notification-frequency">Notification Frequency</label>
+                <p>How often to send summary notifications</p>
+              </div>
+              <select id="notification-frequency" class="form-select">
+                <option value="immediate">Immediate</option>
+                <option value="hourly">Hourly</option>
+                <option value="daily" selected>Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Management -->
+        <div class="settings-section">
+          <h3><i class="fas fa-database"></i> Data Management</h3>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="data-retention">Data Retention (days)</label>
+                <p>How long to keep historical data</p>
+              </div>
+              <input type="number" id="data-retention" value="365" min="30" max="2555" class="form-input">
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label for="backup-frequency">Backup Frequency</label>
+                <p>How often to create system backups</p>
+              </div>
+              <select id="backup-frequency" class="form-select">
+                <option value="daily">Daily</option>
+                <option value="weekly" selected>Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+
+            <div class="setting-item checkbox">
+              <div class="setting-info">
+                <label for="auto-cleanup">Auto Cleanup</label>
+                <p>Automatically remove old temporary files</p>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="auto-cleanup" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-actions">
+                <button class="btn secondary" onclick="exportAllData()">
+                  <i class="fas fa-download"></i>
+                  Export All Data
+                </button>
+                <button class="btn danger" onclick="clearOldData()">
+                  <i class="fas fa-trash"></i>
+                  Clear Old Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="users" class="panel">
+      <div class="panel-header">
+        <h2>User Management</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Reports</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-table">
+            <tr>
+              <td colspan="6" style="text-align:center;padding:20px;">No users table found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reports" class="panel">
+      <div class="panel-header">
+        <h2>Emergency Reports</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Reporter</th>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="reports-table">
+            <tr>
+              <td colspan="7" style="text-align:center;padding:20px;">Loading reports...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SYSTEM ACTIVITY PANEL -->
+    <section id="system-activity" class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>System Activity Monitor</h2>
+          <p class="panel-subtitle">Real-time monitoring of system events and user activities</p>
+        </div>
+        <div class="panel-actions">
+          <button class="btn secondary" onclick="refreshSystemActivity()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+          </button>
+          <button class="btn ghost" onclick="exportActivityLog()">
+            <i class="fas fa-download"></i>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <div class="activity-dashboard">
+        <div class="activity-stats">
+          <div class="stat-card">
+            <div class="stat-icon primary">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value" id="active-users-count">0</div>
+              <div class="stat-label">Active Users</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon success">
+              <i class="fas fa-sign-in-alt"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value" id="login-attempts-today">0</div>
+              <div class="stat-label">Logins Today</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon warning">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value" id="failed-logins-today">0</div>
+              <div class="stat-label">Failed Logins</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon info">
+              <i class="fas fa-database"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value" id="data-access-count">0</div>
+              <div class="stat-label">Data Access</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="activity-log">
+          <h3>Recent Activity</h3>
+          <div class="activity-feed" id="activity-feed">
+            <div class="activity-item loading">
+              <div class="activity-icon">
+                <i class="fas fa-spinner fa-spin"></i>
+              </div>
+              <div class="activity-content">
+                <div class="activity-message">Loading activity data...</div>
+                <div class="activity-time">Just now</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AUDIT LOGS PANEL -->
+    <section id="audit-logs" class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Audit Logs</h2>
+          <p class="panel-subtitle">Comprehensive audit trail of all system activities and data changes</p>
+        </div>
+        <div class="panel-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search audit logs..." id="audit-search">
+          </div>
+          <select id="audit-filter" onchange="filterAuditLogs(this.value)">
+            <option value="all">All Actions</option>
+            <option value="login">Login Events</option>
+            <option value="data_access">Data Access</option>
+            <option value="data_change">Data Changes</option>
+            <option value="security">Security Events</option>
+          </select>
+          <button class="btn ghost" onclick="exportAuditLogs()">
+            <i class="fas fa-download"></i>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Resource</th>
+              <th>Details</th>
+              <th>IP Address</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table">
+            <tr>
+              <td colspan="7" class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading audit logs...</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <div class="footer-info">
+          <span>Showing <span id="audit-showing-count">0</span> of <span id="audit-total-count">0</span> audit entries</span>
+          <select id="audit-rows-per-page" onchange="changeAuditRowsPerPage(this.value)">
+            <option value="25">25 per page</option>
+            <option value="50" selected>50 per page</option>
+            <option value="100">100 per page</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <button class="pagination-btn" onclick="prevAuditPage()" disabled>
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <div class="page-numbers">
+            <span class="page-number active">1</span>
+            <span class="page-number">2</span>
+            <span class="page-number">3</span>
+            <span class="dots">...</span>
+            <span class="page-number">10</span>
+          </div>
+          <button class="pagination-btn" onclick="nextAuditPage()">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Add Responder Modal -->
+<div id="add-responder-modal" class="modal-overlay">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Add New Responder</h3>
+      <button class="modal-close" onclick="closeAddResponderModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="responder-name">Full Name *</label>
+          <div class="input-with-icon">
+            <i class="fas fa-user"></i>
+            <input id="responder-name" placeholder="Enter full name" class="form-input">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="responder-unit">Unit/Department *</label>
+          <div class="input-with-icon">
+            <i class="fas fa-building"></i>
+            <input id="responder-unit" placeholder="e.g., Fire Station 1, Police Dept" class="form-input">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="responder-contact">Contact Number *</label>
+          <div class="input-with-icon">
+            <i class="fas fa-phone"></i>
+            <input id="responder-contact" placeholder="+1 (555) 123-4567" class="form-input">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="responder-email">Email Address</label>
+          <div class="input-with-icon">
+            <i class="fas fa-envelope"></i>
+            <input id="responder-email" type="email" placeholder="responder@agency.gov" class="form-input">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="responder-badge">Badge/ID Number</label>
+          <div class="input-with-icon">
+            <i class="fas fa-id-card"></i>
+            <input id="responder-badge" placeholder="Optional badge or ID number" class="form-input">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="responder-status">Current Status</label>
+          <div class="input-with-icon">
+            <i class="fas fa-signal"></i>
+            <select id="responder-status" class="form-select">
+              <option value="Available">Available</option>
+              <option value="On Duty">On Duty</option>
+              <option value="Assigned">Assigned</option>
+              <option value="Busy">Busy</option>
+              <option value="On Call">On Call</option>
+              <option value="Off Duty">Off Duty</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group full-width">
+          <label for="responder-skills">Special Skills/Qualifications</label>
+          <div class="input-with-icon">
+            <i class="fas fa-certificate"></i>
+            <textarea id="responder-skills" placeholder="Enter special skills or qualifications..." rows="3" class="form-textarea"></textarea>
+          </div>
+        </div>
+        
+        <div class="form-group full-width">
+          <label for="responder-notes">Additional Notes</label>
+          <textarea id="responder-notes" placeholder="Any additional information..." rows="2" class="form-textarea"></textarea>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn secondary" onclick="closeAddResponderModal()">
+        Cancel
+      </button>
+      <button class="btn primary" onclick="saveNewResponder()">
+        <i class="fas fa-save"></i>
+        Save Responder
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Status Update Modal -->
+<div id="status-modal" class="modal-overlay">
+  <div class="modal-dialog small">
+    <div class="modal-header">
+      <h3>Update Responder Status</h3>
+      <button class="modal-close" onclick="closeStatusModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="status-options">
+        <div class="status-option" onclick="selectStatus('Available')">
+          <div class="status-indicator available"></div>
+          <div class="status-info">
+            <div class="status-title">Available</div>
+            <div class="status-desc">Ready to respond</div>
+          </div>
+        </div>
+        
+        <div class="status-option" onclick="selectStatus('On Duty')">
+          <div class="status-indicator on-duty"></div>
+          <div class="status-info">
+            <div class="status-title">On Duty</div>
+            <div class="status-desc">Regular shift</div>
+          </div>
+        </div>
+        
+        <div class="status-option" onclick="selectStatus('Assigned')">
+          <div class="status-indicator assigned"></div>
+          <div class="status-info">
+            <div class="status-title">Assigned</div>
+            <div class="status-desc">Currently assigned</div>
+          </div>
+        </div>
+        
+        <div class="status-option" onclick="selectStatus('Busy')">
+          <div class="status-indicator busy"></div>
+          <div class="status-info">
+            <div class="status-title">Busy</div>
+            <div class="status-desc">Occupied with task</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
