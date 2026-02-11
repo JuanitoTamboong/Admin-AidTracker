@@ -1914,23 +1914,36 @@ window.exportActivityLog = function() {
         showNotification('No activity data to export', 'info');
         return;
     }
-    
-    // Create JSON export
-    const dataStr = JSON.stringify(activityLogs, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
+
+    // Create CSV export
+    const headers = ['Timestamp', 'User', 'Message', 'Type', 'Icon'];
+    const rows = activityLogs.map(log => [
+        new Date(log.timestamp).toLocaleString(),
+        log.user,
+        log.message,
+        log.type,
+        log.icon
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `activity_log_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `activity_log_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    
+
     showNotification(`Exported ${activityLogs.length} activity logs`, 'success');
     logActivity('Exported activity logs', 'success', 'fas fa-download');
-    logAudit(currentUser?.email || 'Admin', 'export_activity', 
-            'Exported activity logs to JSON', 'system');
+    logAudit(currentUser?.email || 'Admin', 'export_activity',
+            'Exported activity logs to CSV', 'system');
 };
 
 window.exportAuditLogs = function() {
