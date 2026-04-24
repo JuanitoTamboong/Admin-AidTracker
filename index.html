@@ -260,13 +260,13 @@
           </select>
         </div>
         <div class="pagination">
-          <button class="pagination-btn" onclick="prevPage()" disabled>
+          <button class="pagination-btn" id="responders-prev-btn" onclick="prevPage()">
             <i class="fas fa-chevron-left"></i>
           </button>
           <div class="page-numbers">
-            <span class="page-number active">1</span>
+            <span class="page-number active" id="responders-page-num">1</span>
           </div>
-          <button class="pagination-btn" onclick="nextPage()" disabled>
+          <button class="pagination-btn" id="responders-next-btn" onclick="nextPage()">
             <i class="fas fa-chevron-right"></i>
           </button>
         </div>
@@ -820,18 +820,49 @@
 
     <section id="reports" class="panel">
       <div class="panel-header">
-        <h2>Emergency Reports</h2>
+        <div class="panel-title">
+          <h2>Emergency Reports</h2>
+          <p class="panel-subtitle">View and manage all emergency reports</p>
+        </div>
+        <div class="panel-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search reports..." id="reports-search">
+          </div>
+          <button class="btn ghost" onclick="exportReports()">
+            <i class="fas fa-download"></i>
+            Export
+          </button>
+        </div>
       </div>
       <div class="table-container">
         <table class="data-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Reporter</th>
-              <th>Type</th>
-              <th>Location</th>
-              <th>Time</th>
-              <th>Status</th>
+              <th onclick="sortReportsTable('id')">
+                <span>ID</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortReportsTable('reporter')">
+                <span>Reporter</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortReportsTable('type')">
+                <span>Type</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortReportsTable('location')">
+                <span>Location</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortReportsTable('created_at')">
+                <span>Time</span>
+                <i class="fas fa-sort"></i>
+              </th>
+              <th onclick="sortReportsTable('status')">
+                <span>Status</span>
+                <i class="fas fa-sort"></i>
+              </th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -844,6 +875,29 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="table-footer">
+        <div class="footer-info">
+          <span>Showing <span id="reports-showing-count">0</span> of <span id="reports-total-count">0</span> reports</span>
+          <select id="reports-rows-per-page" onchange="changeReportsRowsPerPage(this.value)">
+            <option value="10">10 per page</option>
+            <option value="25" selected>25 per page</option>
+            <option value="50">50 per page</option>
+            <option value="100">100 per page</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <button class="pagination-btn" id="reports-prev-btn" onclick="prevReportsPage()">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <div class="page-numbers">
+            <span class="page-number active" id="reports-page-num">1</span>
+          </div>
+          <button class="pagination-btn" id="reports-next-btn" onclick="nextReportsPage()">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
       </div>
     </section>
 
